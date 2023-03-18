@@ -1,0 +1,35 @@
+--Pokretanje sustava--
+Za pokretanje sustava na Linux-u potrebno je samo pokrenuti priloženu shell skriptu 'test.sh'.
+
+Pokretanje pojedinačnih funkcija(Linux)
+    python3 -c 'import pwManager; pwManager.init()' "masterPassword"
+    python3 -c 'import pwManager; pwManager.put()' "masterPassword" "address" "password"
+    python3 -c 'import pwManager; pwManager.get()' "masterPassword" "address"
+Pokretanje pojedinačnih funkcija(Windows)
+    python -c 'import pwManager; pwManager.init()' "masterPassword"
+    python -c 'import pwManager; pwManager.put()' "masterPassword" "address" "password"
+    python -c 'import pwManager; pwManager.get()' "masterPassword" "address"
+
+--Korištene tehnologije--
+    PBKDF2 - generiranje ključa iz masterPassword-a
+    SHA-256 - hashiranje ključa za sigurno spremanje u datoteku
+    AES + EAX - kriptiranje parova adresa-lozinka
+
+--Derivacija ključa--
+Za derivaciju ključa is masterPassword-a koristim funkciju za derivaciju ključeva PBKDF2. 
+Navedena funkcija koristi funkciju HMAC koja u svakoj kombinira ključ i lozinku te na taj niz primjenjuje funkciju SHA-512. 
+Koristim preporučeni broj iteracija(310 000). Veliki broj iteracija produljuje trajanje algoritma, što je praktično protiv brute-force napada.
+Funkcija također koristi salt, nasumično generiran 16B byte-string.
+
+--Spremanje ključa u datoteku--
+Nakon što PBKDF2 generira ključ, dodatno koristim hash funkciju SHA-256 te u datoteku spremam novodobivenu hash vrijednost ključa i salt vrijednost. 
+Svaki put kada korisnik upiše masterPassword u sklopu neke od dostupnih naredbi, sustav čita salt iz prvog reda, provodi funkciju PBKDF2 i dodatno SHA-256.
+Ako je nova hashirana vrijednost jednaka spremljenoj hashiranoj vrijednosti - unešen masterPassword je ispravan.
+
+--Kriptiranje podataka--
+Kriptiranje i dekriptiranje se izvršava sa simetričnim kriptografskim algoritmom AES. Algoritam koristi blokove veličine 128 bita, 
+te prima ključeve 128, 192 ili 256 bita. Ja sam koristio ključ duljine 256 bita. AES provodi niz različitih transformacija na svaki blok podataka te 
+pritom koristi ključ i vrijedost salt. Svaki par adresa-lozinka kriptirao sam sa novim saltom, što dodatno povećava sigurnost te osigurava povjerljivost 
+zaporki i adresa. Taj pristup onemogućava napad zamijene, budući da i adresa i zaporka ovise o istom saltu. Salt spremam u datoteku zajedno s kriptiranim 
+adresama i zaporkama. Integritet sustava osigurao sam korištenjem EAX načina rada. EAX kombinira enkripciju algoritmom AES i kriptografsku autentičnost(MAC).
+EAX prima nasumičan salt i ključ, koristi CTR mod za enkripciju podataka te OMAC za autentifikaciju kriptiranog teksta. 
